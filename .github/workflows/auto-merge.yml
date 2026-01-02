@@ -1,0 +1,54 @@
+name: Auto Merge Contributors
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1️⃣ Checkout the PR branch
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      # 2️⃣ Get the list of all changed files
+      - name: Get changed files
+        id: files
+        uses: tj-actions/changed-files@v44
+
+      # 3️⃣ Validate the file path (Case-Insensitive)
+      - name: Validate contributor file
+        id: validate
+        run: |
+          VALID=false
+          # We check all_changed_files so it works for new files or updates
+          for file in ${{ steps.files.outputs.all_changed_files }}; do
+            # This regex matches 'contributors/' or 'Contributors/'
+            if [[ "$file" =~ ^[Cc]ontributors/[^/]+\.txt$ ]]; then
+              VALID=true
+              echo "✅ Valid file found: $file"
+              break
+            fi
+          done
+
+          if [ "$VALID" = false ]; then
+            echo "❌ No valid contributor file found in the contributors/ directory."
+            exit 1
+          fi
+
+      # 4️⃣ Auto-merge PR (Only happens if validation step passes)
+      - name: Auto-merge PR
+        uses: pascalgn/automerge-action@v0.16.3
+        with:
+          merge-method: squash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
